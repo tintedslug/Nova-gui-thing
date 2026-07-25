@@ -38,10 +38,7 @@ protectGui()
 
 -- Tween helper
 local function tween(obj, props, duration, style, direction)
-	local ti = Instance.new("TweenInfo")
-	ti.Time = duration or 0.2
-	ti.EasingStyle = style or Enum.EasingStyle.Quad
-	ti.EasingDirection = direction or Enum.EasingDirection.Out
+	local ti = TweenInfo.new(duration or 0.2, style or Enum.EasingStyle.Quad, direction or Enum.EasingDirection.Out)
 	local tw = TweenService:Create(obj, ti, props)
 	tw:Play()
 	return tw

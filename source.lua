@@ -498,23 +498,27 @@ function Nova:Notify(config)
 	local startTime = tick()
 
 	-- Fade out after duration
+	local running = true
 	task.spawn(function()
 		task.wait(duration)
+		running = false
 		tween(progressBar, {Size = UDim2.new(0, 0, 0, 2)}, 0.3)
 		tween(frame, {Position = UDim2.new(1, 20, 0, 0), BackgroundTransparency = 1}, 0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-		wait(0.35)
+		task.wait(0.35)
 		for _, v in pairs(frame:GetChildren()) do
-			if v:IsA("ImageLabel") or v:IsA("TextLabel") then
-				tween(v, {TextTransparency = 1, ImageTransparency = 1}, 0.15)
+			if v:IsA("ImageLabel") then
+				tween(v, {ImageTransparency = 1}, 0.15)
+			elseif v:IsA("TextLabel") then
+				tween(v, {TextTransparency = 1}, 0.15)
 			end
 		end
-		wait(0.2)
+		task.wait(0.2)
 		frame:Destroy()
 	end)
 
 	-- Animate progress bar
 	task.spawn(function()
-		while frame and frame.Parent do
+		while running and frame and frame.Parent do
 			local elapsed = tick() - startTime
 			local remaining = math.clamp(1 - (elapsed / duration), 0, 1)
 			progressBar.Size = UDim2.new(remaining, 0, 0, 2)
@@ -671,19 +675,11 @@ function Nova:CreateWindow(config)
 	ContentContainer.Position = UDim2.new(0, 160, 0, 44)
 	ContentContainer.BackgroundColor3 = theme.Window.BackgroundColor
 	ContentContainer.BorderSizePixel = 0
-	ContentContainer.ScrollBarThickness = 4
+	ContentContainer.ScrollBarThickness = 3
 	ContentContainer.ScrollBarImageColor3 = theme.Window.AccentColor
-	ContentContainer.ScrollBarImageTransparency = 0.6
+	ContentContainer.ScrollBarImageTransparency = 0.7
 	ContentContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-	ContentContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	ContentContainer.Parent = Window
-
-	local ContentPadding = Instance.new("UIPadding")
-	ContentPadding.PaddingLeft = UDim.new(0, 10)
-	ContentPadding.PaddingRight = UDim.new(0, 10)
-	ContentPadding.PaddingTop = UDim.new(0, 10)
-	ContentPadding.PaddingBottom = UDim.new(0, 10)
-	ContentPadding.Parent = ContentContainer
 
 	local ContentListLayout = Instance.new("UIListLayout")
 	ContentListLayout.Name = "ContentList"
@@ -691,8 +687,15 @@ function Nova:CreateWindow(config)
 	ContentListLayout.Padding = UDim.new(0, 6)
 	ContentListLayout.Parent = ContentContainer
 
+	local ContentPadding = Instance.new("UIPadding")
+	ContentPadding.PaddingLeft = UDim.new(0, 6)
+	ContentPadding.PaddingRight = UDim.new(0, 6)
+	ContentPadding.PaddingTop = UDim.new(0, 6)
+	ContentPadding.PaddingBottom = UDim.new(0, 6)
+	ContentPadding.Parent = ContentContainer
+
 	ContentListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-		ContentContainer.CanvasSize = UDim2.new(0, 0, 0, ContentListLayout.AbsoluteContentSize.Y + 20)
+		ContentContainer.CanvasSize = UDim2.new(0, 0, 0, ContentListLayout.AbsoluteContentSize.Y + 12)
 	end)
 
 	makeDraggable(Window, Topbar)
@@ -1543,43 +1546,57 @@ function Nova:CreateWindow(config)
 					return
 				end
 
-				if not isListening then
-					local pressed = false
-					if currentKey.ClassName == "EnumItem" and currentKey.EnumType == Enum.KeyCode then
+			if not isListening then
+				local pressed = false
+				local kType = typeof(currentKey)
+				if kType == "EnumItem" then
+					if currentKey.EnumType == Enum.KeyCode then
 						pressed = input.KeyCode == currentKey
-					elseif currentKey.ClassName == "EnumItem" and currentKey.EnumType == Enum.UserInputType then
+					elseif currentKey.EnumType == Enum.UserInputType then
 						pressed = input.UserInputType == currentKey
 					end
+				elseif kType == "KeyCode" then
+					pressed = input.KeyCode == currentKey
+				elseif kType == "UserInputType" then
+					pressed = input.UserInputType == currentKey
+				end
 
-					if pressed then
-						if holdToInteract then
-							isHolding = true
-						end
-						local ok, err = pcall(config.Callback or function() end, currentKey, false)
-						if not ok and not windowInfo.DisableBuildWarnings then
-							warn("Nova: Keybind callback error:", err)
-						end
+				if pressed then
+					if holdToInteract then
+						isHolding = true
+					end
+					local ok, err = pcall(config.Callback or function() end, currentKey, false)
+					if not ok and not windowInfo.DisableBuildWarnings then
+						warn("Nova: Keybind callback error:", err)
 					end
 				end
-			end)
+			end
+		end)
 
-			UserInputService.InputEnded:Connect(function(input)
-				if holdToInteract and isHolding then
-					local released = false
-					if currentKey.ClassName == "EnumItem" and currentKey.EnumType == Enum.KeyCode then
+		UserInputService.InputEnded:Connect(function(input)
+			if holdToInteract and isHolding then
+				local released = false
+				local kType = typeof(currentKey)
+				if kType == "EnumItem" then
+					if currentKey.EnumType == Enum.KeyCode then
 						released = input.KeyCode == currentKey
-					elseif currentKey.ClassName == "EnumItem" and currentKey.EnumType == Enum.UserInputType then
+					elseif currentKey.EnumType == Enum.UserInputType then
 						released = input.UserInputType == currentKey
 					end
-					if released then
-						isHolding = false
-						local ok, err = pcall(config.Callback or function() end, currentKey, true)
-						if not ok and not windowInfo.DisableBuildWarnings then
-							warn("Nova: Keybind callback error:", err)
-						end
+				elseif kType == "KeyCode" then
+					released = input.KeyCode == currentKey
+				elseif kType == "UserInputType" then
+					released = input.UserInputType == currentKey
+				end
+				if released then
+					isHolding = false
+					local ok, err = pcall(config.Callback or function() end, currentKey, true)
+					if not ok and not windowInfo.DisableBuildWarnings then
+						warn("Nova: Keybind callback error:", err)
 					end
 				end
-			end)
+			end
+		end)
 
 			elemFrame.MouseEnter:Connect(function()
 				tween(elemFrame, {BackgroundColor3 = elemTheme.HoverBackgroundColor}, 0.15)
